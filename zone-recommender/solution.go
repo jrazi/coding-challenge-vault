@@ -22,32 +22,32 @@ type Creative struct {
 	tags []string
 }
 
-func addCreative(name string, cpc int16, tagNames []string) string {
-
-	checkTagsExist := func(tags []string) bool {
-		for _, tag := range tags {
-			if _, exists := TagMap[tag]; !exists {
-				return false
-			}
+func checkTagsExist(tags []string) bool {
+	for _, tag := range tags {
+		if _, exists := TagMap[tag]; !exists {
+			return false
 		}
-		return true
 	}
+	return true
+}
+
+func getDistinctTags(tags []string) []string {
+	existMap := make(map[string]bool)
+	distinctTags := make([]string, 0, len(tags))
+	for _, tg := range tags {
+		if _, exists := existMap[tg]; exists {
+			continue
+		}
+		distinctTags = append(distinctTags, tg)
+		existMap[tg] = true
+	}
+	return distinctTags
+}
+
+func addCreative(name string, cpc int16, tagNames []string) string {
 
 	if allExist := checkTagsExist(tagNames); !allExist {
 		return "Error: Tag not found"
-	}
-
-	getDistinctTags := func(tags []string) []string {
-		existMap := make(map[string]bool)
-		distinctTags := make([]string, 0, len(tagNames))
-		for _, tg := range tags {
-			if _, exists := existMap[tg]; exists {
-				continue
-			}
-			distinctTags = append(distinctTags, tg)
-			existMap[tg] = true
-		}
-		return distinctTags
 	}
 
 	distinctTags := getDistinctTags(tagNames)
@@ -75,9 +75,39 @@ func listCreatives() string {
 }
 
 type Zone struct {
+	id   int
 	name string
 	cpc  int16
-	tags []Tag
+	tags []string
+}
+
+func addZone(name string, cpc int16, tagNames []string) string {
+	if allExist := checkTagsExist(tagNames); !allExist {
+		return "Error: Tag not found"
+	}
+
+	distinctTags := getDistinctTags(tagNames)
+
+	if _, exists := ZoneMap[name]; exists {
+		return "Error: Place already exists"
+	}
+
+	id := len(ZoneMap) + 1
+
+	ZoneMap[name] = &Zone{id: id, name: name, cpc: cpc, tags: distinctTags}
+
+	return fmt.Sprintf("Done: Place id is %d", id)
+}
+
+func listZones() string {
+	zonesList := make([]string, len(ZoneMap))
+
+	for _, zone := range ZoneMap {
+		zonesList[zone.id-1] = zone.name
+	}
+
+	zoneListStr := strings.Join(zonesList, " ")
+	return fmt.Sprintf("PLACEs: %s", zoneListStr)
 }
 
 type Tag struct {
@@ -161,6 +191,22 @@ func (q *ListCreativesQuery) execute() string {
 	return listCreatives()
 }
 
+type AddPlaceCommand struct {
+	name string
+	cpc  int16
+	tags []string
+}
+
+func (c *AddPlaceCommand) execute() string {
+	return addZone(c.name, c.cpc, c.tags)
+}
+
+type ListPlaceQuery struct{}
+
+func (q *ListPlaceQuery) execute() string {
+	return listZones()
+}
+
 func makeInstruction(instStr string) (instruction Instruction) {
 	parts := strings.Split(instStr, " ")
 	switch parts[0] {
@@ -174,6 +220,12 @@ func makeInstruction(instStr string) (instruction Instruction) {
 		return &AddCreativeCommand{name: parsed[0][0], cpc: int16(cpc), tags: parsed[2]}
 	case "ADS-LIST":
 		return &ListCreativesQuery{}
+	case "ADD-PLACE":
+		parsed := parseInstruction(parts[1:], []string{"-name", "-cpc", "-tags"})[1:]
+		cpc, _ := strconv.ParseInt(parsed[1][0], 10, 16)
+		return &AddPlaceCommand{name: parsed[0][0], cpc: int16(cpc), tags: parsed[2]}
+	case "PLACE-LIST":
+		return &ListPlaceQuery{}
 	default:
 		panic("unexpected instruction")
 	}
