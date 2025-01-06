@@ -1,5 +1,8 @@
 package main
 
+// https://quera.org/problemset/237883
+// wtf why am I doing this
+
 import (
 	"bufio"
 	"fmt"
